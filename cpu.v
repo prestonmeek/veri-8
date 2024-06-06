@@ -4,7 +4,15 @@
 // TODO: create multiple VRAM buffers and then OR them together to reduce the flicker from XORing
 
 module cpu(
-    input clk
+    input clk,                          // Clock
+    output reg gpu_clear,               // Clear line for GPU
+    output reg gpu_draw,                // Draw line for GPU
+    output reg [7:0] vx,                // Vx register (i.e., V[x] of D[x]yn)
+    output reg [7:0] vy,                // Vy register (i.e., V[y] of Dx[y]n)
+    output reg [7:0] vf,                // Vf register (i.e., V[0xF])
+    output reg [3:0] n_bits,            // lower 4 bits of instruction (i.e., Dxy[n])
+    output reg [119:0] sprite_data,     // TODO: move this to MMU
+    output reg [1:0] cycle_count        // Count of how many cycles have occurred for a given instruction
 );
 
 // NOTE: initial values are supported on xilinx boards
@@ -52,12 +60,17 @@ task pc_prep_jump(input addr)
     end
 endtask
 
+// TODO: I don't think I need this entire RAM line -- I just need some input lines to change specific locations
+// TODO: move this to top_module
 wire [7:0] ram [0:4095];            // RAM bus
 
-mmu u0(                             // MMU
+mmu u_mmu(                          // MMU
     .clk(clk),
     .ram(ram)
 );
+
+gpu_clear, gpu_draw = 0;            // Clear and draw lines for the GPU
+sprite_data = 120'h0;               // TODO: temp, sprite data for the GPU
 
 /*
     nnn or addr - A 12-bit value, the lowest 12 bits of the instruction
@@ -67,12 +80,14 @@ mmu u0(                             // MMU
     kk or byte - An 8-bit value, the lowest 8 bits of the instruction
 */
 reg [11:0] nnn = 12'h0;
-reg [3:0] n_bits, x_bits, y_bits = 4'h0;
+n_bits = 4'h0;
+reg [3:0] x_bits, y_bits = 4'h0;
 reg [7:0] kk = 8'h0;
 
-reg [7:0] vx, vy, v0, vf = 8'h0;    // Vx, Vy, V0, and VF for instructions
+vx, vy, vf = 8'h0;                  // Vx, Vy, V0, and VF for instructions
+reg [7:0] v0 = 8'h0;
 
-reg [1:0] cycle_count = 2'h0;       // Count of how many cycles have occurred for a given instruction
+cycle_count = 2'h0;                 // Keeps track of number of cycles for a given instruction
 
 always @ (posedge clk) begin
     // set default values before case (so default isn't needed within case statements)
@@ -81,7 +96,7 @@ always @ (posedge clk) begin
     case (state)
         STATE_FETCH: begin
             // load the current instruction into the instruction register
-            reg ir <= (ram[pc] << 8) | ram[pc + 1];
+            ir <= (ram[pc] << 8) | ram[pc + 1];
 
             state <= STATE_DECODE;
         end
@@ -109,7 +124,15 @@ always @ (posedge clk) begin
         STATE_EXECUTE: begin
             casez (ir)
                 // 00E0 : Clear the display.
-                16'h00E0 : ;
+                16'h00E0 : begin
+                    if (cycle_count == 0) begin
+                        gpu_clear <= 1;
+                        cycle_count <= cycle_count + 1;
+                    end else begin
+                        gpu_clear <= 0;
+                        state <= STATE_WRITEBACK;
+                    end
+                end
 
                 // 00EE : Return from a subroutine.
                 16'h00EE : begin
@@ -294,7 +317,23 @@ always @ (posedge clk) begin
                 end
 
                 16'hCzzz : ;
-                16'hDzzz : ;
+
+                // Dxyn : Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
+                // Each sprite has a width of 8 pixels and a height of n pixels.
+                // TODO: set VF to 0 before running GPU
+                16'hDzzz : begin
+                    if (cycle_count == 0) begin
+                        gpu_draw <= 1;
+                        // TODO: concat sprite data together
+                        sprite_data <= {
+
+                        };
+                        cycle_count <= cycle_count + 1;
+                    end else if (cycle_count == 1) begin
+                        
+                        cycle_count <= cycle_count + 1;
+                    end
+                end
                 16'hEz9E : ;
                 16'hEzA1 : ;
                 16'hFz07 : ;
