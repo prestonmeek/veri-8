@@ -1,4 +1,5 @@
 // http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
+// https://github.com/JamesGriffin/CHIP-8-Emulator/blob/master/src/chip8.cpp
 
 // TODO: create multiple VRAM buffers and then OR them together to reduce the flicker from XORing
 
@@ -38,10 +39,18 @@ reg [3:0] state = STATE_FETCH;      // 4-bit CPU state
 // PC states
 localparam PC_STATE_INC     = 0;    // increment the PC
 localparam PC_STATE_SKIP    = 1;    // skip next instruction
-localparam PC_STATE_JUMP    = 2;    // jump to a given instruction (pc_jump_val)
+localparam PC_STATE_JUMP    = 2;    // jump to a given instruction (pc_jump_addr)
 
 reg [1:0] pc_state = PC_STATE_INC;  // 2-bit PC state
-reg [15:0] pc_jump_val = 16'h0;     // stored value that the PC jumps to
+reg [15:0] pc_jump_addr = 16'h0;     // stored value that the PC jumps to
+
+// Sets the PC state to JUMP and stores the jump address
+task pc_prep_jump(input addr)
+    begin
+        pc_state <= PC_STATE_JUMP;
+        pc_jump_addr <= addr;
+    end
+endtask
 
 wire [7:0] ram [0:4095];            // RAM bus
 
@@ -99,14 +108,35 @@ always @ (posedge clk) begin
 
         STATE_EXECUTE: begin
             casez (ir)
+                // 00E0 : Clear the display.
                 16'h00E0 : ;
-                16'h00EE : ;
-                16'h0zzz : ;
+
+                // 00EE : Return from a subroutine.
+                16'h00EE : begin
+                    if (cycle_count == 0) begin
+                        // Decrement stack pointer.
+                        sp <= sp - 1;
+                    end else begin
+                        // Then, return from the subroutine at the stack.
+                        // This means we go to its location and jump one more address.
+                        pc_prep_jump(stack[sp] + 2);
+                        state <= STATE_WRITEBACK;
+                    end
+                end
+
+                // 0nnn : Jump to a machine code routine at nnn.
+                16'h0zzz : begin
+                    // pc_state <= PC_STATE_JUMP;
+                    // pc_jump_addr <= nnn;
+                    pc_prep_jump(nnn);
+                    state <= STATE_WRITEBACK;
+                end
 
                 // 1nnn : Jump to location nnn.
                 16'h1zzz : begin
-                    pc_state <= PC_STATE_JUMP;
-                    pc_jump_val <= nnn;
+                    // pc_state <= PC_STATE_JUMP;
+                    // pc_jump_addr <= nnn;
+                    pc_prep_jump(nnn);
                     state <= STATE_WRITEBACK;
                 end
 
@@ -122,8 +152,9 @@ always @ (posedge clk) begin
                         sp <= sp + 1;
 
                         // The PC is then set to nnn.
-                        pc_state <= PC_STATE_JUMP;
-                        pc_jump_val <= nnn;
+                        // pc_state <= PC_STATE_JUMP;
+                        // pc_jump_addr <= nnn;
+                        pc_prep_jump(nnn);
                         
                         state <= STATE_WRITEBACK;
                     end
@@ -183,9 +214,23 @@ always @ (posedge clk) begin
                     state <= STATE_WRITEBACK;
                 end
 
-                // TODO: Verilog arithmetic uses two's complement, so handle math accordingly
-                16'h8zz4 : ;
-                16'h8zz5 : ;
+                // 8xy4 : Set Vx = Vx + Vy, set VF = carry.
+                16'h8zz4 : begin
+                    { vf, vx } <= vx + vy;
+                    state <= STATE_WRITEBACK;
+                end
+
+                // 8xy5 : Set Vx = Vx - Vy, set VF = NOT borrow.
+                16'h8zz5 : begin
+                    if (cycle_count == 0) begin
+                        // If Vx > Vy, then VF is set to 1, otherwise 0.
+                        vf <= (vx > vy);
+                    end else begin
+                        // Then Vy is subtracted from Vx, and the results stored in Vx.
+                        vx <= vx - vy;
+                        state <= STATE_WRITEBACK;
+                    end
+                end
 
                 // 8xy6 : Set Vx = Vx >> 1.
                 16'h8zz6 : begin
@@ -194,17 +239,25 @@ always @ (posedge clk) begin
                         // then VF is set to 1, otherwise 0.
                         // Needs to be zero-extended to 8 bits.
                         vf <= {{7{0}}, vx[0]};
-                        
                         cycle_count <= cycle_count + 1;
                     end else begin
                         // Then Vx is divided by 2 (>> 1).
                         vx <= vx >> 1;
-
                         state <= STATE_WRITEBACK;
                     end
                 end
 
-                16'h8zz7 : ;
+                // 8xy7 : Set Vx = Vy - Vx, set VF = NOT borrow.
+                16'h8zz7 : begin
+                    if (cycle_count == 0) begin
+                        // If Vy > Vx, then VF is set to 1, otherwise 0.
+                        vf <= (vy > vx);
+                    end else begin
+                        // Then Vx is subtracted from Vy, and the results stored in Vx.
+                        vx <= vy - vx;
+                        state <= STATE_WRITEBACK;
+                    end
+                end
 
                 // 8xyE : Set Vx = Vx << 1.
                 16'h8zzE : begin
@@ -235,10 +288,11 @@ always @ (posedge clk) begin
 
                 // Bnnn : Jump to location nnn + V0.
                 16'hBzzz : begin
-                    pc_state <= PC_STATE_JUMP;
-                    pc_jump_val <= nnn + v0;
+                    // pc_state <= PC_STATE_JUMP;
+                    // pc_jump_addr <= nnn + v0;
+                    pc_prep_jump(nnn + v0);
                 end
-                
+
                 16'hCzzz : ;
                 16'hDzzz : ;
                 16'hEz9E : ;
@@ -272,8 +326,10 @@ always @ (posedge clk) begin
             case (pc_state)
                 PC_STATE_INC    : pc <= pc + 2;
                 PC_STATE_JUMP   : pc <= pc + 4;
-                PC_STATE_SKIP   : pc <= pc_jump_val;
+                PC_STATE_SKIP   : pc <= pc_jump_addr;
             endcase
+
+            state <= STATE_FETCH;
         end
     endcase
 end
