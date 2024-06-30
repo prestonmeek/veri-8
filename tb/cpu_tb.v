@@ -9,7 +9,6 @@ wire gpu_clear, gpu_draw;
 wire [7:0] vx, vy, vf;
 wire [3:0] n_bits;
 wire [119:0] sprite_data;
-wire [1:0] cycle_count;
 
 cpu dut(
     .clk(clk),
@@ -19,8 +18,7 @@ cpu dut(
     .vy(vy),
     .vf(vf),
     .n_bits(n_bits),
-    .sprite_data(sprite_data),
-    .cycle_count(cycle_count)
+    .sprite_data(sprite_data)
 );
 
 initial begin

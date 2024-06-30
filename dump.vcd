@@ -1,5 +1,5 @@
 $date
-	Sun Jun 30 13:04:29 2024
+	Sun Jun 30 12:44:09 2024
 $end
 $version
 	Icarus Verilog
@@ -10,7 +10,7 @@ $end
 $scope module cpu_tb $end
 $scope module dut $end
 $scope module u_mmu $end
-$var reg 8 ! \ram[746] [7:0] $end
+$var reg 8 ! \ram[512] [7:0] $end
 $upscope $end
 $upscope $end
 $upscope $end
@@ -68,18 +68,16 @@ $var wire 8 D write_data [7:0] $end
 $var wire 1 = write_enable $end
 $var reg 120 E data_out [119:0] $end
 $var reg 16 F ir [15:0] $end
-$var integer 32 G i [31:0] $end
 $upscope $end
 $scope task pc_prep_jump $end
-$var reg 1 H addr $end
+$var reg 1 G addr $end
 $upscope $end
 $upscope $end
 $upscope $end
 $enddefinitions $end
 #0
 $dumpvars
-xH
-bx G
+xG
 bx F
 bx E
 b0 D
@@ -117,13 +115,12 @@ bx %
 0$
 b1101011 #
 b10 "
-b10000000 !
+b1101010 !
 $end
 #1
 b110101000000010 %
 b110101000000010 F
 b1 4
-b0 G
 1$
 #2
 0$
@@ -470,7 +467,7 @@ b1 '
 b11 4
 b10 /
 b1 2
-0H
+0G
 1$
 #100
 0$

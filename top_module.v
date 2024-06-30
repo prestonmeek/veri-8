@@ -8,11 +8,13 @@ module top_module(
     input clk
 );
 
+// TODO: i dont think GPU should have direct access to vf
+// and it also probably shouldnt to vx or vy.. idk tho
+
 wire clear, draw;
 wire [7:0] vx, vy, vf;
 wire [3:0] n_bits;
 wire [119:0] sprite_data;
-wire [1:0] cycle_count;
 
 cpu u_cpu(
     .clk(clk),
@@ -22,8 +24,7 @@ cpu u_cpu(
     .vy(vy),
     .vf(vf),
     .n_bits(n_bits),
-    .sprite_data(sprite_data),      // TODO: move this to MMU
-    .cycle_count(cycle_count)
+    .sprite_data(sprite_data)   // TODO: move this to MMU
 );
 
 gpu u_gpu(
@@ -34,7 +35,6 @@ gpu u_gpu(
     .col(vx),
     .height(n_bits),
     .sprite_data(sprite_data),
-    .cycle_count(cycle_count),
     .vf(vf)
 )
 

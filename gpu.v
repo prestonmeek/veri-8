@@ -6,7 +6,6 @@ module gpu(
     input [7:0] col,                // Start col (Vx)
     input [7:0] height,             // Height of sprite (n)
     input [119:0] sprite_data,      // Entire sprite data (max 120 bits aka 15 bytes)
-    input [1:0] cycle_count,        // Current drawing cycle
     output reg [7:0] vf             // Need to set VF = 1 if a pixel is flipped
 );
 
@@ -15,6 +14,8 @@ module gpu(
 integer i, j;
 
 reg [63:0] vram [0:31];             // 64 x 32 monochrome display (32 rows, 64 cols)
+
+reg [1:0] cycle_count = 0;          // Current drawing cycle
 
 task clear_vram();
     begin
@@ -29,7 +30,6 @@ initial clear_vram();
 always @ (posedge clk) begin
     if (clear) begin 
         clear_vram();
-
     end else if (draw) begin
         // Grab the current row of the sprite
         for (i = 0; i < height; i = i + 1) begin
@@ -37,16 +37,21 @@ always @ (posedge clk) begin
             for (j = 0; j < 8; j = j + 1) begin
                 // Sprites are stored MSbyte to LSbyte (first row is most significant, i.e., 14 to 0)
                 // Sprites are drawn from MSbit to LSbit (7 to 0)
-                if (sprite_data[((14 - i) * 8) + 7 - j] == 1) begin
+                if (sprite_data[((14 - i) * 8) + (7 - j)] == 1) begin
                     // First cycle is simply setting the pixel flipped flag
                     // Second cycle is actually drawing the sprite
-                    if (cycle_count == 1)
+                    if (cycle_count == 0) begin
                         // Set pixel flipped flag to 1 if ANY pixel is flipped
                         // Since only one has to be flipped, we never set it back to 0
-                        if (vram[row + i][col + j] == 1) vf <= 1;
-                    else if (cycle_count == 2)
-                        // Pixels are XORed
+                        if (vram[row + i][col + j] == 1) 
+                            vf <= 1;
+
+                        cycle_count <= cycle_count + 1;
+                    end else if (cycle_count == 1) begin
+                        // Pixels are XORed onto the screen
                         vram[row + i][col + j] <= vram[row + i][col + j] ^ 1;
+                        cycle_count <= 0;
+                    end
                 end
             end
         end

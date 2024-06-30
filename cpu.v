@@ -11,8 +11,7 @@ module cpu(
     output reg [7:0] vy,                // Vy register (i.e., V[y] of Dx[y]n)
     output reg [7:0] vf,                // Vf register (i.e., V[0xF])
     output reg [3:0] n_bits,            // lower 4 bits of instruction (i.e., Dxy[n])
-    output reg [119:0] sprite_data,     // TODO: move this to MMU
-    output reg [1:0] cycle_count        // Count of how many cycles have occurred for a given instruction
+    output reg [119:0] sprite_data      // TODO: move this to MMU
 );
 
 // NOTE: initial values are supported on xilinx boards
@@ -24,10 +23,13 @@ reg [7:0] reg_file [0:15];          // 16 general-purpose 8-bit registers (regis
 reg [15:0] vi = 16'h0;              // 16-bit I register
 reg [7:0] vd, vs = 8'h0;            // 8-bit special-purpose delay register and sound register
 
-reg [15:0] pc = 16'h0;          // program counter
+// TODO: make 512 a macro/global and ctrl+f replace any instance of the magic number
+reg [15:0] pc = 16'd512;            // program counter (starts at byte 512)
 
 reg [7:0] sp = 8'h0;                // stack pointer
 reg [15:0] stack [0:15];            // array of 16 16-bit values
+
+reg [2:0] cycle_count = 3'h0;       // Keeps track of number of cycles for a given instruction
 
 // CPU states
 localparam STATE_FETCH      = 0;    // fetch instruction
@@ -55,19 +57,21 @@ task pc_prep_jump(input addr);
 endtask
 
 // TODO: move this to top_module
-reg [11:0] write_addr = 12'h0;
-reg write_flag = 1'h0;      
-reg [1:0] write_len = 2'h0;
-reg [3:0] write_data = 4'h0;
+// TODO: consider making all of these 0 initializations just 0 versus 1'h0 or 12'h0 etc.
+reg write_enable = 1'h0;
+reg [11:0] rw_addr = 12'h0;    
+reg [7:0] write_data = 8'h0;
+reg [3:0] read_len = 4'h0;
+wire [119:0] data_out;
 wire [15:0] ir;                     // instruction register bus
 
 mmu u_mmu(                          // MMU
     .clk(clk),
     .pc(pc),
-    .write_flag(write_flag),
-    .write_addr(write_addr),
-    .write_len(write_len),
+    .write_enable(write_enable),
+    .rw_addr(rw_addr),
     .write_data(write_data),
+    .data_out(data_out),
     .ir(ir)
 );
 
@@ -102,8 +106,6 @@ initial begin
     vx = 8'h0;                          // Vx, Vy, V0, and VF for instructions
     vy = 8'h0;
     vf = 8'h0;                  
-
-    cycle_count = 2'h0;                 // Keeps track of number of cycles for a given instruction
 end
 
 always @ (posedge clk) begin
@@ -343,18 +345,26 @@ always @ (posedge clk) begin
 
                 // Dxyn : Display n-byte sprite starting at memory location I at (Vx, Vy), set VF = collision.
                 // Each sprite has a width of 8 pixels and a height of n pixels.
-                // TODO: set VF to 0 before running GPU
                 16'hDzzz : begin
                     if (cycle_count == 0) begin
-                        gpu_draw <= 1;
-                        // TODO: concat sprite data together
-                        /*sprite_data <= {
-
-                        };*/
+                        vf <= 0;
+                        write_enable <= 0;
+                        rw_addr <= vi;
+                        read_len <= 15;
+ 
                         cycle_count <= cycle_count + 1;
                     end else if (cycle_count == 1) begin
-                        
+                        sprite_data <= data_out;
+                        gpu_draw <= 1;
+
                         cycle_count <= cycle_count + 1;
+                    end else if (cycle_count == 2) begin
+                        // GPU needs 2 cycles to complete
+                        // TODO: maybe make this wait dynamic? as in, some flag that is set when gpu is done
+                        cycle_count <= cycle_count + 1;
+                    end else if (cycle_count == 3) begin
+                        gpu_draw <= 0;
+                        state <= STATE_WRITEBACK;
                     end
                 end
 
@@ -417,19 +427,22 @@ always @ (posedge clk) begin
                     // and the ones digit at location I+2.
 
                     if (cycle_count == 0) begin
-                        write_flag <= 1;
-                        write_addr <= vi;
-                        write_len <= 3;
-                        write_data <= {
-                            vx / 100,
-                            (vx % 100) / 10,
-                            vx % 10
-                        };
+                        write_enable <= 1;
+                        rw_addr <= vi;
+                        write_data <= vx / 100;
 
                         cycle_count <= cycle_count + 1;
+                    end else if (cycle_count == 1) begin
+                        rw_addr <= vi + 1;
+                        write_data <= (vx % 100) / 10;
+                        cycle_count <= cycle_count + 1;
+                    end else if (cycle_count == 2) begin
+                        rw_addr <= vi + 2;
+                        write_data <= vx % 10;
+                        cycle_count <= cycle_count + 1;
                     end else begin
-                        // TODO: reset all other buses somewhere else in the code?
-                        write_flag <= 0;
+                        // TODO: reset all other flags (like rw_addr) somewhere else in the code?
+                        write_enable <= 0;
                         state <= STATE_WRITEBACK;
                     end
                 end
