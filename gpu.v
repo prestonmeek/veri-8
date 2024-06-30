@@ -26,34 +26,51 @@ endtask
 
 initial clear_vram();
 
+initial begin
+    $dumpfile("tb/cpu_tb.vcd");
+    $dumpvars(0, gpu);
+end
+
 // TODO: optimize this to run in less loops? idk how much the compiler optimizes...
 always @ (posedge clk) begin
     if (clear) begin 
         clear_vram();
     end else if (draw) begin
-        // Grab the current row of the sprite
-        for (i = 0; i < height; i = i + 1) begin
-            // Draw the current row
-            for (j = 0; j < 8; j = j + 1) begin
-                // Sprites are stored MSbyte to LSbyte (first row is most significant, i.e., 14 to 0)
-                // Sprites are drawn from MSbit to LSbit (7 to 0)
-                if (sprite_data[((14 - i) * 8) + (7 - j)] == 1) begin
-                    // First cycle is simply setting the pixel flipped flag
-                    // Second cycle is actually drawing the sprite
-                    if (cycle_count == 0) begin
+        // First cycle is simply setting the pixel flipped flag
+        // Second cycle is actually drawing the sprite
+        if (cycle_count == 0) begin
+            // Grab the current row of the sprite
+            for (i = 0; i < height; i = i + 1) begin
+                // Draw the current row
+                for (j = 0; j < 8; j = j + 1) begin
+                    // Sprites are stored MSbyte to LSbyte (first row is most significant, i.e., 14 to 0)
+                    // Sprites are drawn from MSbit to LSbit (7 to 0)
+                    if (sprite_data[((14 - i) * 8) + (7 - j)] == 1) begin
                         // Set pixel flipped flag to 1 if ANY pixel is flipped
                         // Since only one has to be flipped, we never set it back to 0
                         if (vram[row + i][col + j] == 1) 
                             vf <= 1;
-
-                        cycle_count <= cycle_count + 1;
-                    end else if (cycle_count == 1) begin
-                        // Pixels are XORed onto the screen
-                        vram[row + i][col + j] <= vram[row + i][col + j] ^ 1;
-                        cycle_count <= 0;
                     end
                 end
             end
+
+            cycle_count <= cycle_count + 1;
+        end else if (cycle_count == 1) begin
+            // Grab the current row of the sprite
+            for (i = 0; i < height; i = i + 1) begin
+                // Draw the current row
+                for (j = 0; j < 8; j = j + 1) begin
+                    // Sprites are stored MSbyte to LSbyte (first row is most significant, i.e., 14 to 0)
+                    // Sprites are drawn from MSbit to LSbit (7 to 0)
+                    if (sprite_data[((14 - i) * 8) + (7 - j)] == 1) begin
+                        // Pixels are XORed onto the screen
+                        vram[row + i][col + j] <= vram[row + i][col + j] ^ 1;
+                        
+                    end
+                end
+            end
+
+            cycle_count <= 0;
         end
     end
 end

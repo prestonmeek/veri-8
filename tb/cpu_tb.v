@@ -21,6 +21,10 @@ cpu dut(
     .sprite_data(sprite_data)
 );
 
+// TODO: rename testbench to something more general, and add GPU here. connect wires so that u can actually see if the GPU is doing its job!
+// TODO: because rn the GPU has no connections and thus doesnt do anything :(
+// TODO: then remove the $dump stuff in gpu.v
+
 initial begin
     $dumpfile("tb/cpu_tb.vcd");
     $dumpvars(0, dut);

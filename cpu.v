@@ -71,6 +71,7 @@ mmu u_mmu(                          // MMU
     .write_enable(write_enable),
     .rw_addr(rw_addr),
     .write_data(write_data),
+    .read_len(read_len),
     .data_out(data_out),
     .ir(ir)
 );
@@ -354,15 +355,18 @@ always @ (posedge clk) begin
  
                         cycle_count <= cycle_count + 1;
                     end else if (cycle_count == 1) begin
-                        sprite_data <= data_out;
-                        gpu_draw <= 1;
-
+                        // Need to wait for MMU state to stabilize
+                        // TODO: directly wire data_out to sprite_data so a clock cycle isn't wasted?
                         cycle_count <= cycle_count + 1;
                     end else if (cycle_count == 2) begin
+                        sprite_data <= data_out;
+                        gpu_draw <= 1;
+                        cycle_count <= cycle_count + 1;
+                    end else if (cycle_count == 3 || cycle_count == 4) begin
                         // GPU needs 2 cycles to complete
                         // TODO: maybe make this wait dynamic? as in, some flag that is set when gpu is done
                         cycle_count <= cycle_count + 1;
-                    end else if (cycle_count == 3) begin
+                    end else if (cycle_count == 5) begin
                         gpu_draw <= 0;
                         state <= STATE_WRITEBACK;
                     end

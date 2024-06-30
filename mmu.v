@@ -9,6 +9,8 @@ module mmu(
     output reg [15:0] ir            // Instruction register
 );
 
+integer i;
+
 // TODO: different write lengths?
 // TODO: dynamic game selection
 
@@ -29,28 +31,11 @@ always @ (posedge clk) begin
     if (write_enable)
         // TODO: maybe consider allowing multiple bytes to be written in one clock cycle?
         ram[rw_addr] <= write_data;
-end
-
-genvar g;
-integer i;
-
-// TODO: next time, ditch this and just make the read ram bus a fixed size like 16 bytes or smthn
-generate
-    always @ (posedge clk) begin
-        if (!write_enable) begin
-            for (i = 0; i < read_len; i = i + 1) begin
-                // This stores data in data_out starting at the MSbyte
-                // For example, if read_len is 3 (for the example, indices are 0-indexed bytes):
-                // data_out[2] <= ram[addr + 0]
-                // data_out[1] <= ram[addr + 1]
-                // data_out[0] <= ram[addr + 2]
-                // data_out[14:3] are ignored (NOT ZEROED)
-
-                // -: 8 grabs 8 bits down i.e., d[23 -: 8] == d[23:16]
-                data_out[8 * (read_len - i) - 1 -: 8] <= ram[rw_addr + i];
-            end
-        end
+    else begin
+        for (i = 0; i < read_len; i = i + 1)
+            data_out[8 * (read_len - i) - 1 -: 8] <= ram[rw_addr + i];
     end
-endgenerate
+
+end
 
 endmodule
