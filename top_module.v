@@ -10,7 +10,7 @@ module top_module(
 
 wire clear, draw;
 wire [7:0] vx, vy, vf;
-wire [3:0] n_bits
+wire [3:0] n_bits;
 wire [119:0] sprite_data;
 wire [1:0] cycle_count;
 

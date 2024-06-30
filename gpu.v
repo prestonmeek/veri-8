@@ -7,7 +7,7 @@ module gpu(
     input [7:0] height,             // Height of sprite (n)
     input [119:0] sprite_data,      // Entire sprite data (max 120 bits aka 15 bytes)
     input [1:0] cycle_count,        // Current drawing cycle
-    output [7:0] vf                 // Need to set VF = 1 if a pixel is flipped
+    output reg [7:0] vf             // Need to set VF = 1 if a pixel is flipped
 );
 
 // NOTE: if a number base system is not specified, Verilog defaults to decimal
@@ -16,21 +16,21 @@ integer i, j;
 
 reg [63:0] vram [0:31];             // 64 x 32 monochrome display (32 rows, 64 cols)
 
-task clear_vram()
+task clear_vram();
     begin
         for (i = 0; i < 32; i = i + 1)
             vram[i] = 64'h0;
     end
 endtask
 
-clear_vram();
+initial clear_vram();
 
 // TODO: optimize this to run in less loops? idk how much the compiler optimizes...
 always @ (posedge clk) begin
     if (clear) begin 
         clear_vram();
 
-    end else if (write) begin
+    end else if (draw) begin
         // Grab the current row of the sprite
         for (i = 0; i < height; i = i + 1) begin
             // Draw the current row
