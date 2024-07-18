@@ -21,7 +21,7 @@ reg [7:0] ram [0:4095];     // 4096 bytes of ram
 initial begin
     $readmemh("games/pong.hex", ram, 512, 4095);
     $dumpfile("tb/cpu_tb.vcd");
-    $dumpvars(0, ram[746], ram[513], ram[514]);
+    // $dumpvars(0, ram[746], ram[513], ram[514]);
 end
 
 always @ (posedge clk) begin
@@ -32,6 +32,7 @@ always @ (posedge clk) begin
         // TODO: maybe consider allowing multiple bytes to be written in one clock cycle?
         ram[rw_addr] <= write_data;
     else begin
+        // TODO: make sure this actually works?
         for (i = 0; i < read_len; i = i + 1)
             data_out[8 * (read_len - i) - 1 -: 8] <= ram[rw_addr + i];
     end
