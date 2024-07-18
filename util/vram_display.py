@@ -30,7 +30,7 @@ master = Tk()
 SCALE_FACTOR = 12
 WIDTH = 64
 HEIGHT = 32
-DELAY = 2  # Delay in milliseconds
+DELAY = 0.25  # Delay in milliseconds
 
 w = Canvas(master, width=WIDTH*SCALE_FACTOR, height=HEIGHT*SCALE_FACTOR, background="black")
 w.pack()

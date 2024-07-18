@@ -19,7 +19,7 @@ def write_hex(file_path, data: str):
     except Exception as e:
         print(f"An error occurred: {e}")
 
-data = get_hex("../games/pong.rom")
-write_hex("../games/pong_new.rom", data)
+data = get_hex("../games/brix.rom")
+write_hex("../games/brix.hex", data)
 
 print("Done!")

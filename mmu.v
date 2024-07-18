@@ -4,7 +4,7 @@ module mmu(
     input write_enable,             // Write flag (if 1, then write to memory, else if 0, then read to memory)
     input [11:0] rw_addr,           // Read-write address (12 bits aka 2^12 = 4096)
     input [7:0] write_data,         // Write data
-    input [3:0] read_len,           // Length of data to read (max 15 bytes)
+    input [3:0] read_len,           // Length of data to read in bytes (max 15 bytes)
     output reg [119:0] data_out,    // Output data (15 bytes) TODO: make 15 bytes a constant?
     output reg [15:0] ir            // Instruction register
 );
@@ -20,7 +20,7 @@ reg [7:0] ram [0:4095];     // 4096 bytes of ram
 // CHIP-8 games start at byte 512 and end at byte 4095
 initial begin
     $readmemh("games/pong.hex", ram, 512, 4095);
-    $dumpfile("tb/cpu_tb.vcd");
+    // $dumpfile("tb/cpu_tb.vcd");
     // $dumpvars(0, ram[746], ram[513], ram[514]);
 end
 

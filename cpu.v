@@ -16,7 +16,7 @@ module cpu(
 
 // NOTE: initial values are supported on xilinx boards
 
-integer i;                          // used for for loops (for initialization purposes)
+integer i;                          // used for for loops (for initialization)
 
 reg [7:0] reg_file [0:15];          // 16 general-purpose 8-bit registers (register file)
 
@@ -29,7 +29,7 @@ reg [15:0] pc = 16'd512;            // program counter (starts at byte 512)
 reg [7:0] sp = 8'h0;                // stack pointer
 reg [15:0] stack [0:15];            // array of 16 16-bit values
 
-reg [2:0] cycle_count = 3'h0;       // Keeps track of number of cycles for a given instruction
+reg [7:0] cycle_count = 0;          // Keeps track of number of cycles for a given instruction (TODO: decide size)
 
 // CPU states
 localparam STATE_FETCH      = 0;    // fetch instruction
@@ -138,7 +138,7 @@ always @ (posedge clk) begin
             vf      <= reg_file[15]; // 0d15 = 0xF
 
             // Reset cycle count before execute state
-            cycle_count <= 2'h0;
+            cycle_count <= 0;
 
             state <= STATE_EXECUTE;
         end
@@ -161,6 +161,7 @@ always @ (posedge clk) begin
                     if (cycle_count == 0) begin
                         // Decrement stack pointer.
                         sp <= sp - 1;
+                        cycle_count <= cycle_count + 1;
                     end else begin
                         // Then, return from the subroutine at the stack.
                         // This means we go to its location and jump one more address.
@@ -270,6 +271,7 @@ always @ (posedge clk) begin
                     if (cycle_count == 0) begin
                         // If Vx > Vy, then VF is set to 1, otherwise 0.
                         vf <= (vx > vy);
+                        cycle_count <= cycle_count + 1;
                     end else begin
                         // Then Vy is subtracted from Vx, and the results stored in Vx.
                         vx <= vx - vy;
@@ -451,12 +453,32 @@ always @ (posedge clk) begin
                     end
                 end
 
+                // Fx55 : Store registers V0 through Vx in memory starting at location I.
+                // TODO: NEED TO OPTIMIZE THIS it is super slow rn
                 16'hFz55 : begin
+                    if (cycle_count == x_bits) begin
+                        write_enable <= 0;
+                        state <= STATE_WRITEBACK;
+                    end else begin
+                        write_enable <= 1;
+                        rw_addr <= vi + cycle_count;
+                        write_data <= reg_file[cycle_count];
 
+                        cycle_count <= cycle_count + 1;
+                    end
                 end
 
+                // Fx65 : Read registers V0 through Vx from memory starting at location I.
+                // TODO: this
                 16'hFz65 : begin
-
+                    if (cycle_count == 0) begin // TODO: change from 0 to x_bits
+                        write_enable <= 0;
+                        state <= STATE_WRITEBACK;
+                    end else begin
+                        write_enable <= 0;
+                        rw_addr <= vi + cycle_count;
+                        read_len <= 1;
+                    end
                 end
             endcase
 
